@@ -5,6 +5,9 @@ const port = 3042;
 
 app.use(cors());
 app.use(express.json());
+const { secp256k1 } = require("ethereum-cryptography/secp256k1");
+const { keccak256 } = require("ethereum-cryptography/keccak");
+const { utf8ToBytes } = require("ethereum-cryptography/utils");
 
 const balances = {
   "03d7eb125c163475dec82d3783e848646a5168f6ddb856773c01fbcd7d762c3969": 100,
@@ -48,11 +51,35 @@ app.get("/balance/:address", (req, res) => {
   const balance = balances[address] || 0;
   res.send({ balance });
 });
+function recoverPublicKey(message, signature, recoveryBit) {
+  const messageBytes = utf8ToBytes(message);
+  const messageHash = keccak256(messageBytes);
+
+  const r = Buffer.from(signature.r, "hex"); // Ensure r is passed as hex
+  const s = Buffer.from(signature.s, "hex"); // Ensure s is passed as hex
+
+  return secp256k1.recoverPublicKey(messageHash, { r, s }, recoveryBit);
+}
 
 app.post("/send", (req, res) => {
-  const { sender, recipient, amount } = req.body;
+  // TODO: get a signature from the client-side application
+  // recover the public address from the signature
 
-  setInitialBalance(sender);
+  const { signature, recipient, amount, message } = req.body;
+
+  console.log(signature + "aaa");
+
+  if (!signature || !recipient || !amount || !message) {
+    return res.status(400).send({ message: "Missing parameters" });
+  }
+
+  const recoveryBit = signature?.recovery || true;
+
+  const sender = recoverPublicKey(message, signature, recoveryBit);
+
+  const senderAddress = sender.toString("hex"); // Convert the Buffer to hex string
+
+  setInitialBalance(senderAddress);
   setInitialBalance(recipient);
 
   if (balances[sender] < amount) {
@@ -60,7 +87,7 @@ app.post("/send", (req, res) => {
   } else {
     balances[sender] -= amount;
     balances[recipient] += amount;
-    res.send({ balance: balances[sender] });
+    res.send({ balance: balances[senderAddress] });
   }
 });
 

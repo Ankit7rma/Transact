@@ -3,7 +3,7 @@ import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import server from "./server";
 
-function Transfer({ address, setBalance }) {
+function Transfer({ message, signature, setBalance }) {
   const [sendAmount, setSendAmount] = useState("");
   const [recipient, setRecipient] = useState("");
 
@@ -16,9 +16,14 @@ function Transfer({ address, setBalance }) {
       const {
         data: { balance },
       } = await server.post(`send`, {
-        sender: address,
-        amount: parseInt(sendAmount),
+        signature: {
+          r: signature.r,
+          s: signature.s,
+          recovery: signature.recovery,
+        },
         recipient,
+        amount: parseInt(sendAmount),
+        message,
       });
 
       setBalance(balance);
@@ -34,7 +39,7 @@ function Transfer({ address, setBalance }) {
       setRecipient("");
     } catch (ex) {
       // Show error toast
-      toast.error(`Error: ${ex.response.data.message}`, {
+      toast.error(`Error: ${ex.response?.data?.message}`, {
         position: "top-right",
         autoClose: 3000,
       });
